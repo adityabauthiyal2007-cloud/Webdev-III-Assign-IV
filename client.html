@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101113">
+  <title>LinkUp — Live chat</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <a class="brand" href="#chat" aria-label="LinkUp home"><span class="brand-mark">✳</span><span>LinkUp</span></a>
+      <nav aria-label="Workspace navigation">
+        <div class="side-label">Workspace</div>
+        <button class="nav-item nav-button active" id="live-chat-link" type="button"><span class="nav-icon">◉</span>Live chat</button>
+        <button class="nav-item nav-button" id="people-link" type="button"><span class="nav-icon">♧</span>People online <span class="nav-count" id="people-count">—</span></button>
+        <div class="room-card"><div class="room-top"><span><span class="room-hash">#</span> <span id="sidebar-room">Delhi</span></span><span class="room-chevron" id="room-type">Public</span></div><p>Open class conversation</p></div>
+      </nav>
+      <div class="sidebar-note"><b>About this chat</b>Messages are shared live. Private server history is saved across server restarts.</div>
+    </aside>
+    <main>
+      <header class="topbar"><div><div class="eyebrow" id="location-label">Public server / <span id="breadcrumb-room">Delhi</span></div><h1 id="page-title">Live conversation</h1></div><div class="topbar-actions"><button class="name-control" id="edit-name" type="button" title="Change your username">Name: <span id="current-name">Set username</span> ✎</button><div class="connection"><span class="dot" id="connection-dot"></span><span id="connection-label">Connecting…</span></div></div></header>
+      <div class="content">
+        <section class="dashboard-view" id="dashboard-view"><div class="eyebrow">WORKSPACE</div><h2>You're not in a server.</h2><p>Choose a public server or create/join a private one.</p><div class="server-grid"><article class="server-card"><div class="server-card-icon">D</div><h3>Delhi</h3><p>Join the Delhi public conversation.</p><button class="join-server" data-room="Delhi" type="button">Join Delhi <span>→</span></button></article><article class="server-card"><div class="server-card-icon">M</div><h3>Mumbai</h3><p>Join the Mumbai public conversation.</p><button class="join-server" data-room="Mumbai" type="button">Join Mumbai <span>→</span></button></article><article class="server-card"><div class="server-card-icon">H</div><h3>Haryana</h3><p>Join the Haryana public conversation.</p><button class="join-server" data-room="Haryana" type="button">Join Haryana <span>→</span></button></article><article class="server-card private-card"><div class="server-card-icon">＋</div><h3>Private server</h3><p>Password protected. Share the server name and password with invitees.</p><button class="join-server" id="private-server-link" type="button">Create or join <span>→</span></button></article></div></section>
+        <div id="chat-view" hidden>
+          <div class="welcome"><div><div class="eyebrow">YOUR CLASS, IN REAL TIME</div><h2>Good to see you.</h2><p>A little space to keep the conversation going.</p></div><span class="date-chip" id="today"></span></div>
+          <section class="stats" aria-label="Room status"><div class="stat"><div><div class="stat-label">People online</div><div class="stat-value" id="active-count">—</div></div><span class="stat-icon">♧</span></div><div class="stat"><div><div class="stat-label">Server status</div><div class="stat-value status-value" id="server-status">Waiting</div></div><span class="stat-icon status-icon">⌁</span></div></section>
+          <section class="chat" id="chat" aria-label="Live chat"><div class="chat-head"><div><div class="chat-title"># <span id="room-heading">Delhi</span></div><div class="chat-sub">A shared public conversation</div></div><div class="chat-actions"><button class="delete-room" id="delete-room" type="button" hidden>Delete server</button><span class="live-tag">● &nbsp;Live</span></div></div><div class="messages" id="messages" aria-live="polite"><div class="empty-hint" id="empty-hint">Connecting to the class server…</div></div><div class="composer-wrap"><form class="composer" id="message-form"><input id="message-input" type="text" maxlength="1000" autocomplete="off" placeholder="Write a message…" aria-label="Write a message"><button class="send" id="send-button" type="submit" aria-label="Send message" disabled>↑</button></form><div class="helper">Enter to send <span aria-hidden="true">·</span> Messages appear for everyone in this room</div></div></section>
+        </div>
+      </div>
+    </main>
+  </div>
+  <dialog class="people-dialog username-dialog" id="username-dialog" aria-labelledby="username-title"><form id="username-form"><div class="dialog-head"><div><div class="dialog-title" id="username-title">Choose your username</div><div class="dialog-subtitle">This name appears beside your messages and in People online.</div></div></div><label class="username-label" for="username-input">Username</label><input class="username-input" id="username-input" type="text" maxlength="24" minlength="2" autocomplete="nickname" placeholder="e.g. Sam" required><div class="username-actions"><button class="username-save" type="submit">Save username</button></div></form></dialog>
+  <dialog class="people-dialog private-dialog" id="private-dialog" aria-labelledby="private-title"><div class="dialog-head"><div><div class="dialog-title" id="private-title">Private server</div><div class="dialog-subtitle">Create a room or join one with its name and password.</div></div><button class="close-dialog" id="close-private" type="button" aria-label="Close">×</button></div><label class="username-label" for="private-name">Server name</label><input class="username-input" id="private-name" type="text" maxlength="40" minlength="2" autocomplete="off" placeholder="e.g. Study group"><label class="username-label" for="private-password">Password</label><input class="username-input" id="private-password" type="password" maxlength="100" minlength="4" autocomplete="new-password" placeholder="At least 4 characters"><div class="private-error" id="private-error" role="status"></div><div class="private-actions"><button class="private-submit secondary" id="join-private" type="button">Join server</button><button class="private-submit" id="create-private" type="button">Create server</button></div></dialog>
+  <dialog class="people-dialog" id="people-dialog"><div class="dialog-head"><div><div class="dialog-title">People online</div><div class="dialog-subtitle" id="dialog-count">0 people connected</div></div><button class="close-dialog" id="close-dialog" type="button" aria-label="Close">×</button></div><ul class="people-list" id="people-list"></ul></dialog>
+  <div class="toast" id="toast" role="status"></div>
+  <script>
+    const messages = document.getElementById('messages');
+    const input = document.getElementById('message-input');
+    const sendButton = document.getElementById('send-button');
+    const dot = document.getElementById('connection-dot');
+    const connectionLabel = document.getElementById('connection-label');
+    const dialog = document.getElementById('people-dialog');
+    const peopleList = document.getElementById('people-list');
+    const myId = getOrCreateId();
+    const ownerToken = getOrCreateOwnerToken();
+    const availableRooms = ['Delhi', 'Mumbai', 'Haryana'];
+    if (window.location.pathname !== '/') window.history.replaceState({}, '', '/');
+    let currentRoom = availableRooms.includes(localStorage.getItem('commonroom-room')) ? localStorage.getItem('commonroom-room') : 'Delhi';
+    let currentRoomKey = null;
+    let isPrivateRoom = false;
+    let isRoomOwner = false;
+    let privateCredentials = null;
+    localStorage.setItem('commonroom-dashboard', 'true');
+    let inDashboard = true;
+    let myName = localStorage.getItem('commonroom-name') || '';
+    const usernameDialog = document.getElementById('username-dialog');
+    const usernameInput = document.getElementById('username-input');
+    const privateDialog = document.getElementById('private-dialog');
+    let socket;
+    let toastTimer;
+    let roomJoinTimer;
+    let serverHandshakeTimer;
+    let joinedRoom = false;
+    let isIdentified = false;
+    let serverReady = false;
+    const renderedMessageIds = new Set();
+
+    document.getElementById('today').textContent = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date());
+    function getOrCreateId() {
+      let id = localStorage.getItem('commonroom-id');
+      if (!id) { id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('commonroom-id', id); }
+      return id;
+    }
+    function getOrCreateOwnerToken() {
+      let token = localStorage.getItem('linkup-owner-token');
+      if (!token) {
+        token = crypto.randomUUID ? `${crypto.randomUUID()}${crypto.randomUUID()}` : Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, '0')).join('');
+        localStorage.setItem('linkup-owner-token', token);
+      }
+      return token;
+    }
+    function showRoomError() {
+      joinedRoom = false; sendButton.disabled = true;
+      messages.replaceChildren(); const hint = document.createElement('div'); hint.className = 'empty-hint room-error';
+      hint.textContent = 'The server did not answer the room request. Stop it with Ctrl+C, then run node server.js and reload this page.';
+      messages.append(hint);
+    }
+    function startRoomWait() {
+      joinedRoom = false; sendButton.disabled = true;
+      clearTimeout(roomJoinTimer);
+      roomJoinTimer = setTimeout(showRoomError, 5000);
+    }
+    function identify() {
+      if (socket?.connected && myName) {
+        startRoomWait();
+        socket.emit('identify', { id: myId, name: myName, room: currentRoom });
+        isIdentified = true;
+      }
+    }
+    function setText(id, value) {
+      const element = document.getElementById(id);
+      if (element) element.textContent = value;
+    }
+    function requestRoomJoin() {
+      if (inDashboard || !myName || !socket?.connected) return;
+      startRoomWait();
+      if (isIdentified) socket.emit('switch-room', currentRoom);
+      else {
+        isIdentified = true;
+        socket.emit('identify', { id: myId, name: myName, room: currentRoom });
+      }
+    }
+    function setDashboardView() {
+      const dashboard = document.getElementById('dashboard-view');
+      const chatView = document.getElementById('chat-view');
+      if (dashboard) dashboard.hidden = !inDashboard;
+      if (chatView) chatView.hidden = inDashboard;
+      setText('page-title', inDashboard ? 'Dashboard' : 'Live conversation');
+      setText('location-label', inDashboard ? 'Workspace / Dashboard' : `${isPrivateRoom ? 'Private' : 'Public'} server / ${currentRoom}`);
+      document.getElementById('live-chat-link')?.classList.add('active');
+      setText('sidebar-room', inDashboard ? 'None' : currentRoom);
+      setText('room-type', inDashboard ? '—' : (isPrivateRoom ? 'Private' : 'Public'));
+      const deleteButton = document.getElementById('delete-room');
+      if (deleteButton) deleteButton.hidden = inDashboard || !isPrivateRoom || !isRoomOwner;
+      if (inDashboard) renderPeople([]);
+    }
+    function leaveCurrentRoom() {
+      inDashboard = true; localStorage.setItem('commonroom-dashboard', 'true');
+      clearTimeout(roomJoinTimer);
+      if (socket?.connected && isIdentified) socket.emit('leave-room');
+      joinedRoom = false; sendButton.disabled = true;
+      currentRoomKey = null; isPrivateRoom = false; isRoomOwner = false; privateCredentials = null;
+      setDashboardView();
+    }
+    function joinServer(room) {
+      if (!availableRooms.includes(room)) return;
+      currentRoom = room; localStorage.setItem('commonroom-room', room); localStorage.removeItem('commonroom-dashboard');
+      currentRoomKey = room; isPrivateRoom = false; isRoomOwner = false; privateCredentials = null;
+      inDashboard = false; updateRoomLabels(); setDashboardView();
+      messages.replaceChildren(); const hint = document.createElement('div'); hint.className = 'empty-hint joining-hint'; hint.textContent = `Joining ${currentRoom}…`; messages.append(hint);
+      renderPeople(null);
+      startRoomWait(); requestRoomJoin();
+    }
+    function updateRoomLabels() {
+      setText('sidebar-room', inDashboard ? 'None' : currentRoom);
+      setText('breadcrumb-room', inDashboard ? 'No server selected' : currentRoom);
+      setText('room-heading', currentRoom);
+    }
+    function setConnection(connected) {
+      if (dot) dot.className = 'dot ' + (connected ? 'online' : 'offline');
+      setText('connection-label', connected ? 'Connected' : 'Disconnected');
+      setText('server-status', connected ? 'Online' : 'Offline');
+      sendButton.disabled = !connected || !joinedRoom;
+    }
+    function timeFor(timestamp) {
+      return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(new Date(timestamp || Date.now()));
+    }
+    function addMessage(message) {
+      if (!message || typeof message.text !== 'string' || renderedMessageIds.has(message.id)) return;
+      if (message.id) renderedMessageIds.add(message.id);
+      document.getElementById('empty-hint')?.remove();
+      const row = document.createElement('div');
+      const mine = message.senderId === myId;
+      row.className = 'message' + (mine ? ' mine' : '');
+      const avatar = document.createElement('div'); avatar.className = 'avatar'; avatar.textContent = (mine ? myName : (message.sender || 'Guest')).slice(0, 1).toUpperCase();
+      const wrap = document.createElement('div'); wrap.className = 'bubble-wrap';
+      const meta = document.createElement('div'); meta.className = 'message-meta';
+      const name = document.createElement('span'); name.className = 'sender'; name.textContent = mine ? 'You' : (message.sender || 'Guest');
+      const time = document.createElement('span'); time.textContent = timeFor(message.timestamp); meta.append(name, time);
+      const bubble = document.createElement('div'); bubble.className = 'bubble'; bubble.textContent = message.text;
+      wrap.append(meta, bubble); row.append(avatar, wrap); messages.append(row); messages.scrollTop = messages.scrollHeight;
+    }
+    function addSystemMessage(text) {
+      const row = document.createElement('div'); row.className = 'message system';
+      const pill = document.createElement('span'); pill.className = 'system-pill'; pill.textContent = text; row.append(pill); messages.append(row); messages.scrollTop = messages.scrollHeight;
+    }
+    function renderPeople(people) {
+      if (inDashboard) {
+        setText('active-count', '0'); setText('people-count', '0'); setText('dialog-count', 'Not in a server');
+        if (peopleList) { peopleList.replaceChildren(); const li = document.createElement('li'); li.className = 'no-people'; li.textContent = 'Join a public server to see its connected people.'; peopleList.append(li); } return;
+      }
+      if (!Array.isArray(people)) {
+        setText('active-count', '—'); setText('people-count', '…'); setText('dialog-count', 'Waiting for room presence…');
+        if (peopleList) { peopleList.replaceChildren(); const li = document.createElement('li'); li.className = 'no-people'; li.textContent = 'Loading connected people…'; peopleList.append(li); } return;
+      }
+      setText('active-count', String(people.length));
+      setText('people-count', String(people.length));
+      setText('dialog-count', `${people.length} ${people.length === 1 ? 'person' : 'people'} connected`);
+      if (!peopleList) return;
+      peopleList.replaceChildren();
+      if (!people.length) { const li = document.createElement('li'); li.className = 'no-people'; li.textContent = 'No one is connected right now.'; peopleList.append(li); return; }
+      people.forEach(person => {
+        const li = document.createElement('li'); li.className = 'person';
+        const avatar = document.createElement('span'); avatar.className = 'person-avatar'; avatar.textContent = (person.name || 'G').slice(0, 1).toUpperCase();
+        const name = document.createElement('span'); name.className = 'person-name'; name.textContent = person.id === myId ? `${person.name} (you)` : person.name;
+        const online = document.createElement('span'); online.className = 'person-online'; online.textContent = 'Online'; li.append(avatar, name, online); peopleList.append(li);
+      });
+    }
+    function showToast(text) {
+      const toast = document.getElementById('toast'); toast.textContent = text; toast.classList.add('show');
+      clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove('show'), 2400);
+    }
+
+    function enterPrivateRoom(result, credentials, reconnecting) {
+      currentRoom = result.roomName;
+      currentRoomKey = result.room;
+      isPrivateRoom = true;
+      isRoomOwner = Boolean(result.isOwner);
+      privateCredentials = { name: credentials.name, password: credentials.password, ownerToken };
+      inDashboard = false;
+      localStorage.removeItem('commonroom-dashboard');
+      updateRoomLabels(); setDashboardView();
+      clearTimeout(roomJoinTimer); joinedRoom = true; isIdentified = true;
+      setConnection(true); messages.replaceChildren(); renderedMessageIds.clear();
+      (result.messages || []).forEach(addMessage);
+      if (!result.messages?.length) {
+        const hint = document.createElement('div'); hint.className = 'empty-hint'; hint.textContent = `Welcome to ${currentRoom}. Start the conversation!`; messages.append(hint);
+      }
+      renderPeople(result.people || []);
+      if (!reconnecting && privateDialog.open) privateDialog.close();
+      if (!reconnecting) { showToast(`Joined private server: ${currentRoom}`); input.focus(); }
+    }
+
+    function connectPrivateServer(mode, credentials, reconnecting = false) {
+      if (!socket?.connected) {
+        document.getElementById('private-error').textContent = 'The chat server is still connecting. Try again in a moment.';
+        return;
+      }
+      const error = document.getElementById('private-error');
+      error.textContent = reconnecting ? 'Rejoining your private server…' : '';
+      const createButton = document.getElementById('create-private');
+      const joinButton = document.getElementById('join-private');
+      createButton.disabled = joinButton.disabled = true;
+      const timeout = setTimeout(() => {
+        createButton.disabled = joinButton.disabled = false;
+        error.textContent = 'The server did not respond. Restart it and try again.';
+      }, 5000);
+      socket.emit('private-room', { ...credentials, ownerToken, mode, id: myId, userName: myName }, result => {
+        clearTimeout(timeout); createButton.disabled = joinButton.disabled = false;
+        if (!result?.ok) {
+          if (mode === 'create' && /already taken/i.test(result?.error || '')) {
+            error.textContent = 'That room exists. Joining with its password…';
+            connectPrivateServer('join', credentials, reconnecting);
+            return;
+          }
+          if (!reconnecting) error.textContent = result?.error || 'Could not join that private server.';
+          return;
+        }
+        try {
+          enterPrivateRoom(result, credentials, reconnecting);
+        } catch (error) {
+          console.error('Private room was joined but the page could not switch views:', error);
+          document.getElementById('private-error').textContent = `Joined, but the chat view failed to open: ${error.message}`;
+          createButton.disabled = joinButton.disabled = false;
+        }
+      });
+    }
+
+    function submitPrivateServer(mode) {
+      const credentials = {
+        name: document.getElementById('private-name').value.trim(),
+        password: document.getElementById('private-password').value,
+      };
+      if (credentials.name.length < 2 || credentials.name.length > 40) { document.getElementById('private-error').textContent = 'Server name must be 2–40 characters.'; return; }
+      if (credentials.password.length < 4 || credentials.password.length > 100) { document.getElementById('private-error').textContent = 'Password must be 4–100 characters.'; return; }
+      if (!myName) { document.getElementById('private-error').textContent = 'Choose a username first.'; return; }
+      connectPrivateServer(mode, credentials);
+    }
+
+    function leaveDeletedPrivateRoom(roomId, roomName) {
+      if (currentRoomKey !== roomId) return;
+      currentRoom = roomName;
+      currentRoomKey = null;
+      isPrivateRoom = false;
+      isRoomOwner = false;
+      privateCredentials = null;
+      joinedRoom = false;
+      isIdentified = false;
+      inDashboard = true;
+      localStorage.setItem('commonroom-dashboard', 'true');
+      messages.replaceChildren();
+      setDashboardView();
+      showToast(`${roomName} was deleted.`);
+    }
+
+    async function deleteCurrentPrivateRoom() {
+      if (!isPrivateRoom || !isRoomOwner) return;
+      if (!confirm(`Delete “${currentRoom}” and its saved history? This cannot be undone.`)) return;
+      const roomId = currentRoomKey;
+      const roomName = currentRoom;
+      const button = document.getElementById('delete-room');
+      button.disabled = true;
+      try {
+        const response = await fetch(`/api/private-servers/${encodeURIComponent(roomId)}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ownerToken }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) {
+          showToast(result.error || 'Could not delete this server.');
+          button.disabled = false;
+          return;
+        }
+        leaveDeletedPrivateRoom(roomId, roomName);
+      } catch {
+        showToast('Could not reach the server to delete this room.');
+        button.disabled = false;
+      }
+    }
+
+    document.getElementById('people-link').addEventListener('click', () => dialog.showModal());
+    document.getElementById('private-server-link').addEventListener('click', () => { document.getElementById('private-error').textContent = ''; privateDialog.showModal(); });
+    document.getElementById('delete-room').addEventListener('click', deleteCurrentPrivateRoom);
+    document.getElementById('close-private').addEventListener('click', () => privateDialog.close());
+    document.getElementById('create-private').addEventListener('click', () => submitPrivateServer('create'));
+    document.getElementById('join-private').addEventListener('click', () => submitPrivateServer('join'));
+    document.getElementById('close-dialog').addEventListener('click', () => dialog.close());
+    dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+    document.getElementById('live-chat-link').addEventListener('click', leaveCurrentRoom);
+    document.querySelectorAll('.join-server[data-room]').forEach(button => button.addEventListener('click', () => joinServer(button.dataset.room)));
+    document.getElementById('edit-name').addEventListener('click', () => { usernameInput.value = myName; usernameDialog.showModal(); usernameInput.focus(); });
+    document.getElementById('username-form').addEventListener('submit', event => {
+      event.preventDefault(); const name = usernameInput.value.trim();
+      if (name.length < 2) { usernameInput.setCustomValidity('Please enter at least 2 characters.'); usernameInput.reportValidity(); return; }
+      usernameInput.setCustomValidity(''); myName = name.slice(0, 24); localStorage.setItem('commonroom-name', myName);
+      document.getElementById('current-name').textContent = myName; usernameDialog.close();
+      if (socket?.connected && isIdentified) socket.emit('set-name', myName);
+      if (inDashboard) return;
+      if (!socket?.connected || !isIdentified) requestRoomJoin();
+    });
+    updateRoomLabels();
+    setDashboardView();
+    renderPeople(null);
+    if (!myName) { usernameDialog.showModal(); } else { document.getElementById('current-name').textContent = myName; }
+
+    if (typeof io === 'undefined') {
+      setConnection(false); connectionLabel.textContent = 'Socket.IO unavailable';
+      addSystemMessage('Could not load Socket.IO. Restart the server and reload this page.');
+    } else {
+      socket = io({ transports: ['websocket', 'polling'], reconnection: true });
+      socket.on('connect', () => {
+        setConnection(true); serverReady = false; joinedRoom = false; sendButton.disabled = true;
+        isIdentified = false;
+        clearTimeout(serverHandshakeTimer);
+        serverHandshakeTimer = setTimeout(() => { if (!serverReady) { connectionLabel.textContent = 'Restart server'; document.getElementById('server-status').textContent = 'Outdated'; } }, 3500);
+        if (myName && !inDashboard) startRoomWait();
+      });
+      socket.on('server-ready', payload => {
+        serverReady = Array.isArray(payload?.rooms) && availableRooms.every(room => payload.rooms.includes(room));
+        clearTimeout(serverHandshakeTimer);
+        if (!serverReady) { connectionLabel.textContent = 'Restart server'; document.getElementById('server-status').textContent = 'Outdated'; showRoomError(); }
+        else if (!inDashboard && myName && !joinedRoom) {
+          if (isPrivateRoom && privateCredentials) connectPrivateServer('join', privateCredentials, true);
+          else requestRoomJoin();
+        }
+      });
+      socket.on('disconnect', () => { clearTimeout(roomJoinTimer); setConnection(false); joinedRoom = false; isIdentified = false; renderPeople(null); });
+      socket.on('connect_error', () => { setConnection(false); connectionLabel.textContent = 'Could not reach server'; });
+      socket.on('presence', payload => { if (payload?.room === currentRoomKey) renderPeople(payload.people); });
+      socket.on('history', payload => {
+        if (payload?.room !== currentRoomKey || !Array.isArray(payload.messages)) return;
+        clearTimeout(roomJoinTimer); joinedRoom = true; setConnection(true);
+        messages.replaceChildren(); renderedMessageIds.clear(); payload.messages.forEach(addMessage);
+        if (!payload.messages.length) { const hint = document.createElement('div'); hint.id = 'empty-hint'; hint.className = 'empty-hint'; hint.textContent = `No messages in ${currentRoom} yet. Say hello!`; messages.append(hint); }
+      });
+      socket.on('chat', addMessage);
+      socket.on('join', addSystemMessage);
+      socket.on('private-room-deleted', payload => leaveDeletedPrivateRoom(payload.room, payload.roomName));
+    }
+
+    document.getElementById('message-form').addEventListener('submit', event => {
+      event.preventDefault(); const text = input.value.trim();
+      if (!text) return;
+      if (!socket?.connected) { showToast('Connect to the server before sending.'); return; }
+      socket.emit('msg', text); input.value = ''; input.focus();
+    });
+  </script>
+</body>
+</html>
